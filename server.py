@@ -1,8 +1,8 @@
 import asyncio
 import json
 import websockets
+import os
 
-# Хранилище для активных сетевых соединений
 connected_sockets = {"agent": None, "client": None}
 
 async def handler(websocket):
@@ -15,7 +15,6 @@ async def handler(websocket):
             sender = data.get("sender")
             msg_type = data.get("type")
 
-            # Регистрируем участников в зависимости от того, кто прислал пакет
             if sender == "agent":
                 connected_sockets["agent"] = websocket
             elif sender == "client":
@@ -23,7 +22,6 @@ async def handler(websocket):
 
             print(f"[СЕРВЕР] Получен пакет '{msg_type}' от [{sender}]")
 
-            # Пересылаем сообщение второму участнику (маршрутизация)
             if sender == "client" and connected_sockets["agent"]:
                 await connected_sockets["agent"].send(message)
             elif sender == "agent" and connected_sockets["client"]:
@@ -32,7 +30,6 @@ async def handler(websocket):
     except websockets.ConnectionClosed:
         pass
     finally:
-        # Очищаем ссылки, если кто-то отключился
         if websocket == connected_sockets["agent"]:
             connected_sockets["agent"] = None
             print("[СЕРВЕР] Агент (Игровой ПК) отключился.")
@@ -41,12 +38,16 @@ async def handler(websocket):
             print("[СЕРВЕР] Клиент (Браузер) отключился.")
 
 async def main():
+    # Render сам назначит порт через переменную окружения PORT
+    port = int(os.environ.get("PORT", 8080))
+    
     print("====================================================")
-    print("Сигнальный сервер CloudNET запущен на порту 8080...")
-    print("Ожидание подключений от сайта и агента...")
+    print(f"Сигнальный сервер CloudNET запущен на порту {port}...")
     print("====================================================")
-    async with websockets.serve(handler, "localhost", 8080):
-        await asyncio.Future() # Бесконечный цикл работы сервера
+    
+    # Слушаем 0.0.0.0, чтобы сервер принимал внешние запросы из интернета
+    async with websockets.serve(handler, "0.0.0.0", port):
+        await asyncio.Future()
 
 if __name__ == "__main__":
     asyncio.run(main())
